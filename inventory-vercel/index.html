@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventar — Sistem za upravljanje</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#08090d;--surface:#11131a;--surface2:#1a1d28;--surface3:#232735;
+  --border:#272b3a;--border2:#343952;
+  --text:#e8eaf4;--text2:#8790ab;--text3:#5a6280;
+  --accent:#7c6aef;--accent2:#a99eff;--accent-bg:rgba(124,106,239,.08);
+  --green:#34d399;--green-bg:rgba(52,211,153,.1);
+  --red:#f87171;--red-bg:rgba(248,113,113,.1);
+  --orange:#fbbf24;--orange-bg:rgba(251,191,36,.1);
+  --blue:#60a5fa;--blue-bg:rgba(96,165,250,.1);
+  --radius:10px;--radius-lg:14px;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --shadow:0 2px 12px rgba(0,0,0,.35);
+}
+html{font-size:15px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+a{color:var(--accent2);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── Sidebar ── */
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:230px;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;
+  padding:28px 0 20px}
+.logo{padding:0 22px 32px;display:flex;align-items:center;gap:10px;
+  font-size:1.25rem;font-weight:700;color:var(--accent2);letter-spacing:-.3px}
+.logo svg{width:28px;height:28px;flex-shrink:0}
+.sidebar nav{flex:1;display:flex;flex-direction:column;gap:2px;padding:0 10px}
+.sidebar nav a{display:flex;align-items:center;gap:11px;padding:10px 14px;
+  color:var(--text2);font-size:.875rem;font-weight:500;border-radius:8px;
+  transition:all .12s;text-decoration:none}
+.sidebar nav a:hover{background:var(--surface2);color:var(--text)}
+.sidebar nav a.active{background:var(--accent-bg);color:var(--accent2);font-weight:600}
+.sidebar nav a svg{width:18px;height:18px;flex-shrink:0;opacity:.7}
+.sidebar nav a.active svg{opacity:1}
+.sidebar-footer{padding:16px 22px;border-top:1px solid var(--border);
+  font-size:.7rem;color:var(--text3);line-height:1.5}
+
+/* ── Main ── */
+.main{margin-left:230px;flex:1;padding:32px 36px;min-height:100vh}
+
+/* ── Page Header ── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.page-header h1{font-size:1.5rem;font-weight:700;letter-spacing:-.4px}
+.page-header .subtitle{font-size:.85rem;color:var(--text2);margin-top:2px}
+
+/* ── Stat Cards ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.stat-card .label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.7px;font-weight:600}
+.stat-card .value{font-size:1.75rem;font-weight:700;margin-top:6px;font-family:var(--mono);letter-spacing:-.5px}
+.val-green{color:var(--green)}.val-red{color:var(--red)}.val-orange{color:var(--orange)}.val-accent{color:var(--accent2)}.val-blue{color:var(--blue)}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:20px}
+.card-header{padding:14px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:.9rem;
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-body{padding:20px}
+.card-empty{padding:48px 20px;text-align:center;color:var(--text2);font-size:.9rem}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 20px;font-size:.68rem;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--text3);font-weight:700;background:var(--surface2);border-bottom:1px solid var(--border)}
+td{padding:11px 20px;font-size:.875rem;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(124,106,239,.02)}
+.text-right{text-align:right}.text-center{text-align:center}.text-muted{color:var(--text2)}.text-sm{font-size:.78rem}
+.mono{font-family:var(--mono);font-size:.8rem}
+
+/* ── Badge ── */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.73rem;font-weight:700;font-family:var(--mono)}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-orange{background:var(--orange-bg);color:var(--orange)}
+.badge-blue{background:var(--blue-bg);color:var(--blue)}
+.badge-accent{background:var(--accent-bg);color:var(--accent2)}
+
+/* ── Button ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;
+  font-size:.8rem;font-weight:600;font-family:var(--font);cursor:pointer;transition:all .12s;text-decoration:none;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#6b59dd;text-decoration:none}
+.btn-sm{padding:6px 12px;font-size:.73rem}
+.btn-danger{background:var(--red-bg);color:var(--red)}.btn-danger:hover{background:rgba(248,113,113,.2)}
+.btn-success{background:var(--green-bg);color:var(--green)}.btn-success:hover{background:rgba(52,211,153,.2)}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent2);text-decoration:none}
+.btn-orange{background:var(--orange-bg);color:var(--orange)}.btn-orange:hover{background:rgba(251,191,36,.2)}
+.btn-group{display:flex;gap:6px;align-items:center}
+
+/* ── Forms ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;margin-bottom:5px;font-size:.78rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 14px;background:var(--surface2);
+  color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.9rem;font-family:var(--font);transition:border-color .12s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent)}
+.form-group textarea{resize:vertical;min-height:70px}
+.form-group select{cursor:pointer}
+
+/* ── Filters ── */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+.filters input,.filters select{padding:9px 14px;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;font-size:.82rem;font-family:var(--font)}
+.filters input:focus,.filters select:focus{outline:none;border-color:var(--accent)}
+
+/* ── Flash ── */
+.flash{padding:12px 18px;border-radius:8px;margin-bottom:18px;font-size:.85rem;font-weight:500;
+  display:flex;align-items:center;gap:8px;animation:flashIn .3s}
+.flash-success{background:var(--green-bg);color:var(--green);border:1px solid rgba(52,211,153,.2)}
+.flash-error{background:var(--red-bg);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+@keyframes flashIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Upload Zone ── */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:48px 24px;
+  text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:var(--accent-bg)}
+.upload-zone svg{width:48px;height:48px;color:var(--text3);margin-bottom:12px}
+.upload-zone p{color:var(--text2);font-size:.9rem}
+.upload-zone .hint{font-size:.78rem;color:var(--text3);margin-top:6px}
+
+/* ── Two Col ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  width:90%;max-width:560px;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow);padding:24px}
+.modal h2{font-size:1.15rem;margin-bottom:20px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+/* ── Loading ── */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Excel Preview ── */
+.excel-preview{max-height:400px;overflow:auto;margin:16px 0}
+.excel-preview table{font-size:.8rem}
+.excel-preview th{position:sticky;top:0;z-index:1}
+.mapping-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.mapping-row label{min-width:140px;font-size:.82rem;font-weight:600;color:var(--text2)}
+.mapping-row select{flex:1}
+
+@media(max-width:900px){
+  .sidebar{width:60px}.sidebar .logo span:last-child,.sidebar nav a span,.sidebar-footer{display:none}
+  .sidebar nav a{justify-content:center;padding:12px 0}
+  .main{margin-left:60px;padding:20px}
+  .two-col{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<aside class="sidebar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    <span>Inventar</span>
+  </div>
+  <nav>
+    <a href="#/" data-page="dashboard" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Kontrolna tabla</span>
+    </a>
+    <a href="#/products" data-page="products">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+      <span>Proizvodi</span>
+    </a>
+    <a href="#/categories" data-page="categories">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <span>Kategorije</span>
+    </a>
+    <a href="#/import" data-page="import">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+      <span>Excel Import</span>
+    </a>
+    <a href="#/reports" data-page="reports">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Izveštaji</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    Supabase + Vercel<br>Inventory v2.0
+  </div>
+</aside>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<main class="main">
+  <div id="flash-container"></div>
+  <div id="app"></div>
+</main>
+
+<!-- ═══════════ STOCK MODAL ═══════════ -->
+<div class="modal-overlay" id="stockModal">
+  <div class="modal">
+    <h2 id="stockModalTitle">Promena stanja</h2>
+    <input type="hidden" id="stockProductId">
+    <div class="form-group">
+      <label>Tip promene</label>
+      <select id="stockType">
+        <option value="in">📥 Ulaz (prijem robe)</option>
+        <option value="out">📤 Izlaz (izdavanje)</option>
+        <option value="adjustment">🔧 Korekcija (postavi tačnu vrednost)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Količina</label>
+      <input type="number" id="stockQty" min="1" value="1">
+    </div>
+    <div class="form-group">
+      <label>Napomena</label>
+      <input type="text" id="stockNote" placeholder="npr. Narudžbina #1234">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeStockModal()">Otkaži</button>
+      <button class="btn btn-primary" onclick="submitStockMovement()">Zabeleži</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ PRODUCT MODAL ═══════════ -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal" style="max-width:680px">
+    <h2 id="productModalTitle">Novi proizvod</h2>
+    <input type="hidden" id="editProductId">
+    <div class="form-grid">
+      <div class="form-group"><label>Naziv *</label><input type="text" id="pName" placeholder="npr. Laptop Dell"></div>
+      <div class="form-group"><label>SKU (šifra) *</label><input type="text" id="pSku" placeholder="npr. LAP-001"></div>
+      <div class="form-group"><label>Kategorija</label><select id="pCategory"><option value="">— Izaberite —</option></select></div>
+      <div class="form-group"><label>Prodajna cena (RSD)</label><input type="number" step="0.01" id="pPrice" value="0"></div>
+      <div class="form-group"><label>Nabavna cena (RSD)</label><input type="number" step="0.01" id="pCost" value="0"></div>
+      <div class="form-group"><label>Početna količina</label><input type="number" id="pQty" value="0" min="0"></div>
+      <div class="form-group"><label>Min. količina (alarm)</label><input type="number" id="pMinQty" value="5" min="0"></div>
+      <div class="form-group"><label>Lokacija</label><input type="text" id="pLocation" placeholder="npr. Magacin A"></div>
+      <div class="form-group"><label>Dobavljač</label><input type="text" id="pSupplier" placeholder="npr. TechDist d.o.o."></div>
+    </div>
+    <div class="form-group"><label>Opis</label><textarea id="pDesc" placeholder="Opcioni opis..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeProductModal()">Otkaži</button>
+      <button class="btn btn-primary" id="productSubmitBtn" onclick="submitProduct()">Dodaj</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  SUPABASE INIT
+// ═══════════════════════════════════════════════
+const SUPABASE_URL = 'https://djhrxrhucwfygnjvkqyl.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqaHJ4cmh1Y3dmeWduanZrcXlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTAzMTYsImV4cCI6MjA4OTk2NjMxNn0.APKFBCb4PfuPoiD4c4p5AdUWe6aXpZZ3eFvifPuzvpw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const app = () => $('#app');
+
+function flash(msg, type = 'success') {
+  const c = $('#flash-container');
+  c.innerHTML = `<div class="flash flash-${type}">${type === 'success' ? '✓' : '✕'} ${msg}</div>`;
+  setTimeout(() => c.innerHTML = '', 4000);
+}
+
+function fmt(n) { return Number(n || 0).toLocaleString('sr-RS', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function stockBadge(qty, min) {
+  if (qty === 0) return `<span class="badge badge-red">0</span>`;
+  if (qty <= min) return `<span class="badge badge-orange">${qty}</span>`;
+  return `<span class="badge badge-green">${qty}</span>`;
+}
+
+function movementBadge(t) {
+  if (t === 'in') return '<span class="badge badge-green">Ulaz</span>';
+  if (t === 'out') return '<span class="badge badge-red">Izlaz</span>';
+  return '<span class="badge badge-blue">Korekcija</span>';
+}
+
+function dateFmt(d) { return d ? d.substring(0, 16).replace('T', ' ') : '—'; }
+
+// Cache categories
+let categoriesCache = [];
+async function loadCategories() {
+  const { data } = await sb.from('inv_categories').select('*').order('name');
+  categoriesCache = data || [];
+  return categoriesCache;
+}
+
+function catName(id) {
+  const c = categoriesCache.find(x => x.id == id);
+  return c ? c.name : '—';
+}
+
+// ═══════════════════════════════════════════════
+//  ROUTER
+// ═══════════════════════════════════════════════
+const routes = {
+  '/': renderDashboard,
+  '/products': renderProducts,
+  '/categories': renderCategories,
+  '/import': renderImport,
+  '/reports': renderReports,
+};
+
+function navigate() {
+  const hash = location.hash.slice(1) || '/';
+  const route = routes[hash] || renderDashboard;
+  $$('.sidebar nav a').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + hash || (hash === '/' && a.getAttribute('href') === '#/'));
+  });
+  route();
+}
+
+window.addEventListener('hashchange', navigate);
+window.addEventListener('load', async () => {
+  await loadCategories();
+  navigate();
+});
+
+// ═══════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════
+async function renderDashboard() {
+  app().innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner"></div></div>';
+
+  const [products, movements] = await Promise.all([
+    sb.from('inv_products').select('*, inv_categories(name)'),
+    sb.from('inv_stock_movements').select('*, inv_products(name, sku)').order('created_at', { ascending: false }).limit(10)
+  ]);
+
+  const prods = products.data || [];
+  const movs = movements.data || [];
+
+  const totalValue = prods.reduce((s, p) => s + (p.price * p.quantity), 0);
+  const totalCost = prods.reduce((s, p) => s + (p.cost * p.quantity), 0);
+  const lowStock = prods.filter(p => p.quantity <= p.min_quantity && p.quantity > 0);
+  const outStock = prods.filter(p => p.quantity === 0);
+
+  // Category stats
+  const catStats = {};
+  categoriesCache.forEach(c => catStats[c.id] = { name: c.name, count: 0, qty: 0 });
+  prods.forEach(p => {
+    if (p.category_id && catStats[p.category_id]) {
+      catStats[p.category_id].count++;
+      catStats[p.category_id].qty += p.quantity;
+    }
+  });
+
+  app().innerHTML = `
+    <div class="page-header">
+      <div><h1>Kontrolna tabla</h1><div class="subtitle">Pregled stanja inventara</div></div>
+      <button class="btn btn-primary" onclick="openProductModal()">+ Novi proizvod</button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="label">Ukupno proizvoda</div><div class="value val-accent">${prods.length}</div></div>
+      <div class="stat-card"><div class="label">Vrednost inventara</div><div class="value val-green">${fmt(totalValue)}</div></div>
+      <div class="stat-card"><div class="label">Profit potencijal</div><div class="value val-blue">${fmt(totalValue - totalCost)}</div></div>
+      <div class="stat-card"><div class="label">Nisko stanje</div><div class="value val-orange">${lowStock.length}</div></div>
+      <div class="stat-card"><div class="label">Bez zaliha</div><div class="value val-red">${outStock.length}</div></div>
+      <div class="stat-card"><div class="label">Kategorije</div><div class="value val-accent">${categoriesCache.length}</div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">⚠️ Nisko stanje / Bez zaliha</div>
+        ${[...outStock, ...lowStock].length ? `<table>
+          <thead><tr><th>Proizvod</th><th>SKU</th><th class="text-right">Stanje</th><th class="text-right">Min</th></tr></thead>
+          <tbody>${[...outStock, ...lowStock].slice(0, 10).map(p => `
+            <tr><td><strong>${p.name}</strong></td><td class="mono text-muted">${p.sku}</td>
+            <td class="text-right">${stockBadge(p.quantity, p.min_quantity)}</td>
+            <td class="text-right text-muted">${p.min_quantity}</td></tr>`).join('')}
+          </tbody></table>` : '<div class="card-empty">Svi proizvodi su na zadovoljavajućem nivou ✅</div>'}
+      </div>
+
+      <div class="card">
+        <div class="card-header">🕐 Poslednje promene</div>
+        ${movs.length ? `<table>
+          <thead><tr><th>Proizvod</th><th>Tip</th><th class="text-right">Kol.</th><th>Datum</th></tr></thead>
+          <tbody>${movs.map(m => `
+            <tr><td>${m.inv_products?.name || '—'}</td><td>${movementBadge(m.movement_type)}</td>
+            <td class="text-right mono">${m.quantity}</td><td class="text-muted text-sm">${dateFmt(m.created_at)}</td></tr>`).join('')}
+          </tbody></table>` : '<div class="card-empty">Nema zabeleženih promena</div>'}
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:4px">
+      <div class="card-header">📊 Po kategorijama</div>
+      <table>
+        <thead><tr><th>Kategorija</th><th class="text-right">Proizvoda</th><th class="text-right">Ukupna kol.</th></tr></thead>
+        <tbody>${Object.values(catStats).map(c => `
+          <tr><td>${c.name}</td><td class="text-right">${c.count}</td><td class="text-right">${c.qty}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  PRODUCTS
+// ═══════════════════════════════════════════════
+async function renderProducts() {
+  app().innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner"></div></div>';
+
+  const { data: prods } = await sb.from('inv_products').select('*, inv_categories(name)').order('name');
+  const products = prods || [];
+
+  app().innerHTML = `
+    <div class="page-header">
+      <div><h1>Proizvodi</h1><div class="subtitle">${products.length} artikala ukupno</div></div>
+      <button class="btn btn-primary" onclick="openProductModal()">+ Novi proizvod</button>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="searchInput" placeholder="Pretraga po imenu, SKU, dobavljaču..." style="min-width:280px" oninput="filterProducts()">
+      <select id="catFilter" onchange="filterProducts()">
+        <option value="">Sve kategorije</option>
+        ${categoriesCache.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+      </select>
+      <select id="stockFilter" onchange="filterProducts()">
+        <option value="">Sve zalihe</option>
+        <option value="low">Nisko stanje</option>
+        <option value="out">Bez zaliha</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>Proizvod</th><th>SKU</th><th>Kategorija</th><th class="text-right">Cena</th>
+          <th class="text-right">Nabavna</th><th class="text-right">Stanje</th><th>Lokacija</th><th class="text-right">Akcije</th>
+        </tr></thead>
+        <tbody id="productsBody">
+          ${products.map(p => productRow(p)).join('')}
+        </tbody>
+      </table>
+      ${!products.length ? '<div class="card-empty">Nema proizvoda — dodajte prvi!</div>' : ''}
+    </div>`;
+
+  // Store for filtering
+  window._allProducts = products;
+}
+
+function productRow(p) {
+  return `<tr data-name="${(p.name||'').toLowerCase()}" data-sku="${(p.sku||'').toLowerCase()}" 
+    data-supplier="${(p.supplier||'').toLowerCase()}" data-cat="${p.category_id||''}" data-qty="${p.quantity}" data-min="${p.min_quantity}">
+    <td><strong>${p.name}</strong></td>
+    <td class="mono text-muted">${p.sku}</td>
+    <td>${p.inv_categories ? `<span class="badge badge-accent">${p.inv_categories.name}</span>` : '<span class="text-muted">—</span>'}</td>
+    <td class="text-right mono">${fmt(p.price)}</td>
+    <td class="text-right mono text-muted">${fmt(p.cost)}</td>
+    <td class="text-right">${stockBadge(p.quantity, p.min_quantity)}</td>
+    <td class="text-muted text-sm">${p.location || '—'}</td>
+    <td class="text-right">
+      <div class="btn-group" style="justify-content:flex-end">
+        <button class="btn btn-sm btn-success" onclick="openStockModal(${p.id},'${p.name}',${p.quantity})">± Stanje</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditProduct(${p.id})">Izmeni</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id},'${p.name}')">Obriši</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function filterProducts() {
+  const search = ($('#searchInput')?.value || '').toLowerCase();
+  const cat = $('#catFilter')?.value || '';
+  const stock = $('#stockFilter')?.value || '';
+  
+  $$('#productsBody tr').forEach(tr => {
+    let show = true;
+    if (search && !tr.dataset.name.includes(search) && !tr.dataset.sku.includes(search) && !tr.dataset.supplier.includes(search)) show = false;
+    if (cat && tr.dataset.cat != cat) show = false;
+    if (stock === 'low' && !(Number(tr.dataset.qty) <= Number(tr.dataset.min) && Number(tr.dataset.qty) > 0)) show = false;
+    if (stock === 'out' && Number(tr.dataset.qty) !== 0) show = false;
+    tr.style.display = show ? '' : 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  PRODUCT MODAL (Add / Edit)
+// ═══════════════════════════════════════════════
+function openProductModal() {
+  $('#editProductId').value = '';
+  $('#productModalTitle').textContent = 'Novi proizvod';
+  $('#productSubmitBtn').textContent = 'Dodaj proizvod';
+  $('#pName').value = ''; $('#pSku').value = ''; $('#pPrice').value = '0'; $('#pCost').value = '0';
+  $('#pQty').value = '0'; $('#pMinQty').value = '5'; $('#pLocation').value = '';
+  $('#pSupplier').value = ''; $('#pDesc').value = '';
+  $('#pQty').parentElement.style.display = '';
+
+  // Fill categories
+  const sel = $('#pCategory');
+  sel.innerHTML = '<option value="">— Izaberite —</option>' + categoriesCache.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+  $('#productModal').classList.add('open');
+}
+
+async function openEditProduct(id) {
+  const { data: p } = await sb.from('inv_products').select('*').eq('id', id).single();
+  if (!p) return flash('Proizvod nije pronađen', 'error');
+
+  $('#editProductId').value = p.id;
+  $('#productModalTitle').textContent = 'Izmeni proizvod';
+  $('#productSubmitBtn').textContent = 'Sačuvaj izmene';
+  $('#pName').value = p.name; $('#pSku').value = p.sku;
+  $('#pPrice').value = p.price; $('#pCost').value = p.cost;
+  $('#pQty').value = p.quantity; $('#pMinQty').value = p.min_quantity;
+  $('#pLocation').value = p.location || ''; $('#pSupplier').value = p.supplier || '';
+  $('#pDesc').value = p.description || '';
+  $('#pQty').parentElement.style.display = 'none'; // Hide qty for edit
+
+  const sel = $('#pCategory');
+  sel.innerHTML = '<option value="">— Izaberite —</option>' + categoriesCache.map(c =>
+    `<option value="${c.id}" ${c.id == p.category_id ? 'selected' : ''}>${c.name}</option>`).join('');
+
+  $('#productModal').classList.add('open');
+}
+
+function closeProductModal() { $('#productModal').classList.remove('open'); }
+
+async function submitProduct() {
+  const id = $('#editProductId').value;
+  const payload = {
+    name: $('#pName').value.trim(),
+    sku: $('#pSku').value.trim(),
+    category_id: $('#pCategory').value || null,
+    price: parseFloat($('#pPrice').value) || 0,
+    cost: parseFloat($('#pCost').value) || 0,
+    min_quantity: parseInt($('#pMinQty').value) || 5,
+    location: $('#pLocation').value.trim() || null,
+    supplier: $('#pSupplier').value.trim() || null,
+    description: $('#pDesc').value.trim() || null,
+  };
+
+  if (!payload.name || !payload.sku) return flash('Naziv i SKU su obavezni!', 'error');
+
+  if (id) {
+    payload.updated_at = new Date().toISOString();
+    const { error } = await sb.from('inv_products').update(payload).eq('id', id);
+    if (error) return flash('Greška: ' + error.message, 'error');
+    flash('Proizvod ažuriran!');
+  } else {
+    payload.quantity = parseInt($('#pQty').value) || 0;
+    const { data, error } = await sb.from('inv_products').insert(payload).select().single();
+    if (error) return flash('Greška: ' + error.message, 'error');
+    if (payload.quantity > 0) {
+      await sb.from('inv_stock_movements').insert({
+        product_id: data.id, movement_type: 'in', quantity: payload.quantity, note: 'Početno stanje'
+      });
+    }
+    flash('Proizvod dodat!');
+  }
+
+  closeProductModal();
+  const hash = location.hash.slice(1) || '/';
+  if (hash === '/products') renderProducts();
+  else if (hash === '/') renderDashboard();
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm(`Obrisati "${name}"?`)) return;
+  const { error } = await sb.from('inv_products').delete().eq('id', id);
+  if (error) return flash('Greška: ' + error.message, 'error');
+  flash('Proizvod obrisan.');
+  renderProducts();
+}
+
+// ═══════════════════════════════════════════════
+//  STOCK MODAL
+// ═══════════════════════════════════════════════
+function openStockModal(id, name, currentQty) {
+  $('#stockProductId').value = id;
+  $('#stockModalTitle').textContent = `Promena: ${name} (stanje: ${currentQty})`;
+  $('#stockType').value = 'in'; $('#stockQty').value = '1'; $('#stockNote').value = '';
+  window._currentStockQty = currentQty;
+  $('#stockModal').classList.add('open');
+}
+function closeStockModal() { $('#stockModal').classList.remove('open'); }
+
+async function submitStockMovement() {
+  const productId = $('#stockProductId').value;
+  const type = $('#stockType').value;
+  const qty = parseInt($('#stockQty').value);
+  const note = $('#stockNote').value.trim();
+
+  if (!qty || qty < 1) return flash('Unesite validnu količinu!', 'error');
+
+  let newQty;
+  if (type === 'in') newQty = window._currentStockQty + qty;
+  else if (type === 'out') {
+    if (qty > window._currentStockQty) return flash('Nema dovoljno na stanju!', 'error');
+    newQty = window._currentStockQty - qty;
+  } else {
+    newQty = qty;
+  }
+
+  const { error: e1 } = await sb.from('inv_stock_movements').insert({
+    product_id: productId, movement_type: type, quantity: qty, note: note || null
+  });
+  if (e1) return flash('Greška: ' + e1.message, 'error');
+
+  const { error: e2 } = await sb.from('inv_products').update({
+    quantity: newQty, updated_at: new Date().toISOString()
+  }).eq('id', productId);
+  if (e2) return flash('Greška: ' + e2.message, 'error');
+
+  flash('Promena zabeležena!');
+  closeStockModal();
+  const hash = location.hash.slice(1) || '/';
+  if (hash === '/products') renderProducts();
+  else renderDashboard();
+}
+
+// ═══════════════════════════════════════════════
+//  CATEGORIES
+// ═══════════════════════════════════════════════
+async function renderCategories() {
+  app().innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner"></div></div>';
+  await loadCategories();
+
+  const { data: prods } = await sb.from('inv_products').select('category_id');
+  const countMap = {};
+  (prods || []).forEach(p => { if (p.category_id) countMap[p.category_id] = (countMap[p.category_id] || 0) + 1; });
+
+  app().innerHTML = `
+    <div class="page-header"><h1>Kategorije</h1></div>
+    <div class="two-col">
+      <div class="card" style="padding:24px">
+        <h3 style="margin-bottom:18px">Nova kategorija</h3>
+        <div class="form-group"><label>Naziv</label><input type="text" id="newCatName" placeholder="npr. Elektronika"></div>
+        <div class="form-group"><label>Opis</label><input type="text" id="newCatDesc" placeholder="Kratak opis..."></div>
+        <button class="btn btn-primary" onclick="addCategory()">Dodaj kategoriju</button>
+      </div>
+      <div class="card">
+        <div class="card-header">Postojeće kategorije</div>
+        <table>
+          <thead><tr><th>Naziv</th><th>Opis</th><th class="text-right">Proizvoda</th><th class="text-right">Akcija</th></tr></thead>
+          <tbody>${categoriesCache.map(c => `
+            <tr><td><strong>${c.name}</strong></td><td class="text-muted text-sm">${c.description || '—'}</td>
+            <td class="text-right"><span class="badge badge-accent">${countMap[c.id] || 0}</span></td>
+            <td class="text-right"><button class="btn btn-sm btn-danger" onclick="deleteCategory(${c.id},'${c.name}')">Obriši</button></td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+async function addCategory() {
+  const name = $('#newCatName').value.trim();
+  const desc = $('#newCatDesc').value.trim();
+  if (!name) return flash('Unesite naziv!', 'error');
+  const { error } = await sb.from('inv_categories').insert({ name, description: desc || null });
+  if (error) return flash('Greška: ' + error.message, 'error');
+  await loadCategories();
+  flash('Kategorija dodata!');
+  renderCategories();
+}
+
+async function deleteCategory(id, name) {
+  if (!confirm(`Obrisati kategoriju "${name}"?`)) return;
+  await sb.from('inv_products').update({ category_id: null }).eq('category_id', id);
+  const { error } = await sb.from('inv_categories').delete().eq('id', id);
+  if (error) return flash('Greška: ' + error.message, 'error');
+  await loadCategories();
+  flash('Kategorija obrisana.');
+  renderCategories();
+}
+
+// ═══════════════════════════════════════════════
+//  EXCEL IMPORT
+// ═══════════════════════════════════════════════
+let excelData = null;
+let excelHeaders = [];
+
+function renderImport() {
+  excelData = null;
+  excelHeaders = [];
+
+  app().innerHTML = `
+    <div class="page-header">
+      <div><h1>Excel Import</h1><div class="subtitle">Uvezite proizvode iz .xlsx ili .csv fajla</div></div>
+    </div>
+
+    <div class="card" style="padding:24px">
+      <div class="upload-zone" id="dropZone" onclick="$('#fileInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+        <p><strong>Kliknite ili prevucite fajl ovde</strong></p>
+        <div class="hint">Podržani formati: .xlsx, .xls, .csv</div>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
+    </div>
+
+    <div id="importPreview" style="display:none">
+      <div class="card" style="padding:24px">
+        <h3 style="margin-bottom:16px">📋 Mapiranje kolona</h3>
+        <p class="text-muted text-sm" style="margin-bottom:16px">Povežite kolone iz vašeg fajla sa poljima u bazi:</p>
+        <div id="mappingArea"></div>
+        <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
+          <button class="btn btn-primary" onclick="executeImport()">📥 Uvezi podatke</button>
+          <button class="btn btn-outline" onclick="renderImport()">Otkaži</button>
+          <span id="importStatus" class="text-muted text-sm"></span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-header">Pregled podataka <span class="text-muted text-sm" id="rowCount"></span></div>
+        <div class="excel-preview" id="previewTable"></div>
+      </div>
+    </div>`;
+
+  // Drag & drop
+  const dz = $('#dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!json.length) return flash('Fajl je prazan!', 'error');
+
+      excelData = json;
+      excelHeaders = Object.keys(json[0]);
+      showImportPreview();
+    } catch (err) {
+      flash('Greška pri čitanju fajla: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const dbFields = [
+  { key: 'name', label: 'Naziv *', required: true },
+  { key: 'sku', label: 'SKU *', required: true },
+  { key: 'category', label: 'Kategorija' },
+  { key: 'price', label: 'Prodajna cena' },
+  { key: 'cost', label: 'Nabavna cena' },
+  { key: 'quantity', label: 'Količina' },
+  { key: 'min_quantity', label: 'Min. količina' },
+  { key: 'location', label: 'Lokacija' },
+  { key: 'supplier', label: 'Dobavljač' },
+  { key: 'description', label: 'Opis' },
+];
+
+function showImportPreview() {
+  $('#importPreview').style.display = '';
+  $('#rowCount').textContent = `(${excelData.length} redova)`;
+
+  // Auto-match columns
+  function autoMatch(fieldKey) {
+    const aliases = {
+      name: ['name','naziv','ime','product','artikal','proizvod','item'],
+      sku: ['sku','šifra','sifra','code','kod','barcode','barkod','id','rb'],
+      category: ['category','kategorija','cat','grupa','group','tip','type'],
+      price: ['price','cena','prodajna','sell','selling','maloprodajna'],
+      cost: ['cost','nabavna','purchase','buying','nabavka','trošak','trosak'],
+      quantity: ['quantity','qty','kolicina','količina','stanje','stock','kom','komada'],
+      min_quantity: ['min_quantity','min','minimum','min_qty','minimalna'],
+      location: ['location','lokacija','mesto','warehouse','magacin','polica'],
+      supplier: ['supplier','dobavljač','dobavljac','vendor','source','izvor'],
+      description: ['description','opis','desc','note','napomena','detalji'],
+    };
+    const keys = aliases[fieldKey] || [fieldKey];
+    return excelHeaders.find(h => keys.some(k => h.toLowerCase().replace(/[_\s.-]/g,'').includes(k))) || '';
+  }
+
+  // Mapping UI
+  $('#mappingArea').innerHTML = dbFields.map(f => `
+    <div class="mapping-row">
+      <label>${f.label}</label>
+      <select id="map_${f.key}">
+        <option value="">— Ne uvozi —</option>
+        ${excelHeaders.map(h => `<option value="${h}" ${autoMatch(f.key) === h ? 'selected' : ''}>${h}</option>`).join('')}
+      </select>
+    </div>`).join('');
+
+  // Preview table
+  const preview = excelData.slice(0, 20);
+  $('#previewTable').innerHTML = `<table>
+    <thead><tr>${excelHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${preview.map(row => `<tr>${excelHeaders.map(h => `<td>${row[h] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+async function executeImport() {
+  const mapping = {};
+  dbFields.forEach(f => { mapping[f.key] = $(`#map_${f.key}`)?.value || ''; });
+
+  if (!mapping.name || !mapping.sku) return flash('Naziv i SKU su obavezna polja za mapiranje!', 'error');
+
+  // Build category lookup
+  const catLookup = {};
+  categoriesCache.forEach(c => {
+    catLookup[c.name.toLowerCase()] = c.id;
+    catLookup[c.id] = c.id;
+  });
+
+  const status = $('#importStatus');
+  let imported = 0, errors = 0;
+
+  for (let i = 0; i < excelData.length; i++) {
+    const row = excelData[i];
+    status.textContent = `Uvoz ${i + 1} / ${excelData.length}...`;
+
+    const name = String(row[mapping.name] || '').trim();
+    const sku = String(row[mapping.sku] || '').trim();
+    if (!name || !sku) { errors++; continue; }
+
+    let category_id = null;
+    if (mapping.category) {
+      const catVal = String(row[mapping.category] || '').trim().toLowerCase();
+      if (catVal) {
+        category_id = catLookup[catVal] || null;
+        if (!category_id) {
+          // Create new category
+          const { data: nc } = await sb.from('inv_categories').insert({ name: row[mapping.category].trim() }).select().single();
+          if (nc) { category_id = nc.id; catLookup[catVal] = nc.id; categoriesCache.push(nc); }
+        }
+      }
+    }
+
+    const qty = parseInt(row[mapping.quantity] || 0) || 0;
+
+    const payload = {
+      name, sku, category_id,
+      price: parseFloat(row[mapping.price] || 0) || 0,
+      cost: parseFloat(row[mapping.cost] || 0) || 0,
+      quantity: qty,
+      min_quantity: parseInt(row[mapping.min_quantity] || 5) || 5,
+      location: mapping.location ? String(row[mapping.location] || '').trim() || null : null,
+      supplier: mapping.supplier ? String(row[mapping.supplier] || '').trim() || null : null,
+      description: mapping.description ? String(row[mapping.description] || '').trim() || null : null,
+    };
+
+    const { data, error } = await sb.from('inv_products').upsert(payload, { onConflict: 'sku' }).select().single();
+    if (error) { errors++; continue; }
+
+    if (qty > 0 && data) {
+      await sb.from('inv_stock_movements').insert({
+        product_id: data.id, movement_type: 'in', quantity: qty, note: 'Excel import'
+      });
+    }
+    imported++;
+  }
+
+  await loadCategories();
+  status.textContent = '';
+  flash(`Uvoz završen! ${imported} proizvoda uvezeno${errors ? `, ${errors} grešaka` : ''}.`);
+}
+
+// ═══════════════════════════════════════════════
+//  REPORTS
+// ═══════════════════════════════════════════════
+async function renderReports() {
+  app().innerHTML = '<div style="text-align:center;padding:60px"><div class="spinner"></div></div>';
+
+  const { data: prods } = await sb.from('inv_products').select('*');
+  const { data: movs } = await sb.from('inv_stock_movements').select('*')
+    .gte('created_at', new Date(Date.now() - 30*24*60*60*1000).toISOString());
+
+  const products = prods || [];
+  const movements = movs || [];
+
+  // By category
+  const byCat = {};
+  categoriesCache.forEach(c => byCat[c.id] = { name: c.name, count: 0, qty: 0, value: 0, cost: 0 });
+  products.forEach(p => {
+    if (p.category_id && byCat[p.category_id]) {
+      byCat[p.category_id].count++;
+      byCat[p.category_id].qty += p.quantity;
+      byCat[p.category_id].value += p.price * p.quantity;
+      byCat[p.category_id].cost += p.cost * p.quantity;
+    }
+  });
+
+  // Movement summary
+  const movSum = { in: 0, out: 0, adjustment: 0 };
+  movements.forEach(m => { movSum[m.movement_type] = (movSum[m.movement_type] || 0) + m.quantity; });
+
+  // Top value
+  const topValue = [...products].sort((a, b) => (b.price * b.quantity) - (a.price * a.quantity)).slice(0, 10);
+
+  const totalVal = Object.values(byCat).reduce((s, c) => s + c.value, 0);
+  const totalCost = Object.values(byCat).reduce((s, c) => s + c.cost, 0);
+
+  app().innerHTML = `
+    <div class="page-header"><h1>Izveštaji</h1></div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card"><div class="label">Ulaz (30 dana)</div><div class="value val-green">${movSum.in}</div></div>
+      <div class="stat-card"><div class="label">Izlaz (30 dana)</div><div class="value val-red">${movSum.out}</div></div>
+      <div class="stat-card"><div class="label">Korekcije (30 dana)</div><div class="value val-accent">${movSum.adjustment}</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">💰 Vrednost po kategorijama</div>
+      <table>
+        <thead><tr><th>Kategorija</th><th class="text-right">Proizvoda</th><th class="text-right">Kol.</th>
+          <th class="text-right">Prodajna vr.</th><th class="text-right">Nabavna vr.</th><th class="text-right">Profit</th></tr></thead>
+        <tbody>
+          ${Object.values(byCat).map(c => `<tr>
+            <td><strong>${c.name}</strong></td><td class="text-right">${c.count}</td><td class="text-right">${c.qty}</td>
+            <td class="text-right mono">${fmt(c.value)}</td><td class="text-right mono text-muted">${fmt(c.cost)}</td>
+            <td class="text-right mono val-green">${fmt(c.value - c.cost)}</td></tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="font-weight:700;border-top:2px solid var(--border)">
+          <td>UKUPNO</td><td></td><td></td>
+          <td class="text-right mono">${fmt(totalVal)}</td><td class="text-right mono text-muted">${fmt(totalCost)}</td>
+          <td class="text-right mono val-green">${fmt(totalVal - totalCost)}</td></tr></tfoot>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🏆 Top 10 najvrednijih artikala</div>
+      <table>
+        <thead><tr><th>#</th><th>Proizvod</th><th>SKU</th><th class="text-right">Kol.</th>
+          <th class="text-right">Cena</th><th class="text-right">Ukupno</th></tr></thead>
+        <tbody>${topValue.map((p, i) => `<tr>
+          <td class="text-muted">${i + 1}</td><td><strong>${p.name}</strong></td><td class="mono text-muted">${p.sku}</td>
+          <td class="text-right">${p.quantity}</td><td class="text-right mono">${fmt(p.price)}</td>
+          <td class="text-right mono val-green">${fmt(p.price * p.quantity)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+</script>
+</body>
+</html>
