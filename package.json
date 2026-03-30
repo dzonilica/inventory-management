@@ -1,0 +1,6 @@
+{
+  "name": "inventory-management",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Inventory Management System - Supabase + Vercel"
+}
