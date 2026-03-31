@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventar — Sistem za upravljanje</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#08090d;--sf:#11131a;--sf2:#1a1d28;--sf3:#232735;--bd:#272b3a;--bd2:#343952;--tx:#e8eaf4;--tx2:#8790ab;--tx3:#5a6280;
+--ac:#7c6aef;--ac2:#a99eff;--acb:rgba(124,106,239,.08);--gn:#34d399;--gnb:rgba(52,211,153,.1);--rd:#f87171;--rdb:rgba(248,113,113,.1);
+--or:#fbbf24;--orb:rgba(251,191,36,.1);--bl:#60a5fa;--blb:rgba(96,165,250,.1);--cy:#22d3ee;--cyb:rgba(34,211,238,.1);
+--r:10px;--rl:14px;--f:'DM Sans',system-ui,sans-serif;--m:'JetBrains Mono',monospace}
+html{font-size:14px}body{font-family:var(--f);background:var(--bg);color:var(--tx);min-height:100vh;display:flex}
+a{color:var(--ac2);text-decoration:none}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+
+.sb{position:fixed;top:0;left:0;bottom:0;width:220px;background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;z-index:100;padding:20px 0 16px;overflow-y:auto}
+.logo-area{padding:0 18px 20px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.logo-img{width:38px;height:38px;border-radius:10px;object-fit:cover;background:var(--sf2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.logo-img img{width:100%;height:100%;object-fit:cover}
+.logo-text{font-size:1.15rem;font-weight:700;color:var(--ac2);letter-spacing:-.3px}
+.sb nav{flex:1;display:flex;flex-direction:column;gap:1px;padding:0 8px}
+.nl{font-size:.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--tx3);padding:14px 12px 5px;font-weight:700}
+.sb nav a{display:flex;align-items:center;gap:10px;padding:8px 12px;color:var(--tx2);font-size:.8rem;font-weight:500;border-radius:7px;transition:.12s;text-decoration:none}
+.sb nav a:hover{background:var(--sf2);color:var(--tx)}.sb nav a.active{background:var(--acb);color:var(--ac2);font-weight:600}
+.sb nav a svg{width:16px;height:16px;flex-shrink:0;opacity:.7}.sb nav a.active svg{opacity:1}
+.sb-ft{padding:12px 18px;border-top:1px solid var(--bd);font-size:.65rem;color:var(--tx3);line-height:1.6}
+.sb-ft strong{color:var(--tx2)}
+
+.mn{margin-left:220px;flex:1;padding:24px 28px;min-height:100vh}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.ph h1{font-size:1.3rem;font-weight:700;letter-spacing:-.4px}.ph .st{font-size:.78rem;color:var(--tx2);margin-top:2px}
+.ha{display:flex;gap:7px;flex-wrap:wrap}
+
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:20px}
+.sc{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);padding:16px}
+.sc .lb{font-size:.63rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.sc .vl{font-size:1.5rem;font-weight:700;margin-top:4px;font-family:var(--m);letter-spacing:-.5px}
+.vg{color:var(--gn)}.vr{color:var(--rd)}.vo{color:var(--or)}.va{color:var(--ac2)}.vb{color:var(--bl)}.vc{color:var(--cy)}
+
+.cd{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
+.ch{padding:11px 16px;border-bottom:1px solid var(--bd);font-weight:600;font-size:.84rem;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ce{padding:36px 16px;text-align:center;color:var(--tx2);font-size:.84rem}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:8px 12px;font-size:.63rem;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);font-weight:700;background:var(--sf2);border-bottom:1px solid var(--bd)}
+td{padding:8px 12px;font-size:.8rem;border-bottom:1px solid var(--bd)}
+tr:last-child td{border-bottom:none}tr:hover td{background:rgba(124,106,239,.02)}
+.tr{text-align:right}.tc{text-align:center}.tm{color:var(--tx2)}.ts{font-size:.72rem}
+.mn-t{font-family:var(--m);font-size:.75rem}
+
+.bg{display:inline-block;padding:2px 9px;border-radius:18px;font-size:.7rem;font-weight:700;font-family:var(--m)}
+.bg-g{background:var(--gnb);color:var(--gn)}.bg-r{background:var(--rdb);color:var(--rd)}.bg-o{background:var(--orb);color:var(--or)}
+.bg-b{background:var(--blb);color:var(--bl)}.bg-a{background:var(--acb);color:var(--ac2)}.bg-c{background:var(--cyb);color:var(--cy)}
+
+.bt{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border:none;border-radius:7px;font-size:.75rem;font-weight:600;font-family:var(--f);cursor:pointer;transition:.12s;text-decoration:none;white-space:nowrap}
+.bt-p{background:var(--ac);color:#fff}.bt-p:hover{background:#6b59dd}
+.bt-s{padding:4px 10px;font-size:.7rem}
+.bt-d{background:var(--rdb);color:var(--rd)}.bt-d:hover{background:rgba(248,113,113,.2)}
+.bt-g{background:var(--gnb);color:var(--gn)}.bt-g:hover{background:rgba(52,211,153,.2)}
+.bt-o{background:var(--orb);color:var(--or)}.bt-o:hover{background:rgba(251,191,36,.2)}
+.bt-c{background:var(--cyb);color:var(--cy)}.bt-c:hover{background:rgba(34,211,238,.2)}
+.bt-n{background:transparent;color:var(--tx2);border:1px solid var(--bd)}.bt-n:hover{border-color:var(--ac);color:var(--ac2)}
+.bg-grp{display:flex;gap:5px;align-items:center}
+
+.fg{margin-bottom:12px}.fg label{display:block;margin-bottom:4px;font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.3px}
+.fg input,.fg select,.fg textarea{width:100%;padding:8px 12px;background:var(--sf2);color:var(--tx);border:1px solid var(--bd);border-radius:7px;font-size:.84rem;font-family:var(--f)}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--ac)}.fg textarea{resize:vertical;min-height:55px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+
+.fl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.fl input,.fl select{padding:7px 12px;background:var(--sf2);color:var(--tx);border:1px solid var(--bd);border-radius:7px;font-size:.78rem;font-family:var(--f)}
+
+.flash{padding:10px 14px;border-radius:7px;margin-bottom:14px;font-size:.8rem;font-weight:500;display:flex;align-items:center;gap:7px;animation:fi .3s}
+.flash-s{background:var(--gnb);color:var(--gn);border:1px solid rgba(52,211,153,.2)}
+.flash-e{background:var(--rdb);color:var(--rd);border:1px solid rgba(248,113,113,.2)}
+@keyframes fi{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+.uz{border:2px dashed var(--bd2);border-radius:var(--rl);padding:32px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--sf)}
+.uz:hover,.uz.dg{border-color:var(--ac);background:var(--acb)}
+.uz p{color:var(--tx2);font-size:.84rem}.uz .hn{font-size:.72rem;color:var(--tx3);margin-top:4px}
+
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.mo.open{display:flex}
+.md{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);width:92%;max-width:640px;max-height:85vh;overflow-y:auto;box-shadow:0 2px 12px rgba(0,0,0,.35);padding:20px}
+.md h2{font-size:1.05rem;margin-bottom:16px}.md-a{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+.spn{display:inline-block;width:16px;height:16px;border:2px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:sp .6s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.cb{width:15px;height:15px;accent-color:var(--ac);cursor:pointer}
+.sb-bar{background:var(--acb);border:1px solid rgba(124,106,239,.2);border-radius:7px;padding:9px 14px;margin-bottom:12px;display:none;align-items:center;gap:10px;font-size:.8rem;flex-wrap:wrap}
+.sb-bar strong{color:var(--ac2)}
+
+.eprev{max-height:300px;overflow:auto;margin:12px 0}.eprev table{font-size:.74rem}.eprev th{position:sticky;top:0;z-index:1}
+.mrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--bd)}
+.mrow label{min-width:120px;font-size:.76rem;font-weight:600;color:var(--tx2)}.mrow select{flex:1}
+
+.pbar{width:100%;height:6px;background:var(--sf2);border-radius:3px;overflow:hidden;margin:10px 0}
+.pbar-fill{height:100%;background:var(--ac);border-radius:3px;transition:width .3s}
+.lock-overlay{position:absolute;inset:0;background:rgba(8,9,13,.7);z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:var(--rl);gap:10px;font-size:.88rem;color:var(--ac2)}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tab-bar{display:flex;gap:3px;margin-bottom:14px;border-bottom:1px solid var(--bd)}
+.tab-btn{padding:7px 14px;font-size:.78rem;font-weight:600;color:var(--tx2);cursor:pointer;border-bottom:2px solid transparent}
+.tab-btn:hover{color:var(--tx)}.tab-btn.act{color:var(--ac2);border-bottom-color:var(--ac)}
+
+.col-order{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center}
+.col-chip{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:.72rem;cursor:grab;user-select:none;display:flex;align-items:center;gap:4px}
+.col-chip:active{cursor:grabbing;border-color:var(--ac)}
+.col-chip .grip{color:var(--tx3);font-size:.65rem}
+
+@media(max-width:900px){.sb{width:54px}.sb .logo-text,.sb nav a span,.sb-ft,.nl{display:none}.sb nav a{justify-content:center;padding:10px 0}.mn{margin-left:54px;padding:16px}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<aside class="sb">
+  <div class="logo-area" onclick="document.getElementById('logoInput').click()" title="Kliknite za promenu loga">
+    <div class="logo-img" id="logoContainer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+    <span class="logo-text">Inventar</span>
+    <input type="file" id="logoInput" accept="image/*,.gif" style="display:none" onchange="uploadLogo(this)">
+  </div>
+  <nav>
+    <div class="nl">Pregled</div>
+    <a href="#/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span>Dashboard</span></a>
+    <div class="nl">Baze podataka</div>
+    <a href="#/items"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg><span>Items</span></a>
+    <a href="#/lp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 00-8 0v2"/></svg><span>License Plate</span></a>
+    <a href="#/pl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg><span>Price List</span></a>
+    <a href="#/ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Inv. Accounting</span></a>
+    <div class="nl">Podešavanja</div>
+    <a href="#/ig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg><span>Item Groups</span></a>
+  </nav>
+  <div class="sb-ft"><strong>Autor: Predrag Mirković</strong><br>Supabase + Vercel &middot; v3.0</div>
+</aside>
+
+<main class="mn"><div id="fc"></div><div id="app"></div></main>
+
+<!-- GENERIC FORM MODAL -->
+<div class="mo" id="formModal"><div class="md" id="formModalInner"></div></div>
+<!-- IMPORT MODAL -->
+<div class="mo" id="importModal"><div class="md" style="max-width:780px" id="importModalInner"></div></div>
+
+<script>
+const SB_URL='https://djhrxrhucwfygnjvkqyl.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqaHJ4cmh1Y3dmeWduanZrcXlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTAzMTYsImV4cCI6MjA4OTk2NjMxNn0.APKFBCb4PfuPoiD4c4p5AdUWe6aXpZZ3eFvifPuzvpw';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),A=()=>$('#app');
+function flash(m,t='s'){$('#fc').innerHTML=`<div class="flash flash-${t}">${t==='s'?'✓':'✕'} ${m}</div>`;setTimeout(()=>$('#fc').innerHTML='',4000)}
+function fmt(n){return Number(n||0).toLocaleString('sr-RS',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function dF(d){return d?new Date(d).toLocaleString('sr-RS',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}
+function spin(){return'<div style="text-align:center;padding:40px"><div class="spn"></div></div>'}
+function cM(id){$('#'+id).classList.remove('open')}
+document.querySelectorAll('.mo').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open')}));
+
+// Logo
+function uploadLogo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=e=>{localStorage.setItem('inv_logo',e.target.result);showLogo()};r.readAsDataURL(f)}
+function showLogo(){const d=localStorage.getItem('inv_logo');if(d)$('#logoContainer').innerHTML=`<img src="${d}" alt="Logo">`}
+showLogo();
+
+// Item Groups cache
+let IG=[];
+async function loadIG(){const{data}=await sb.from('inv_item_groups').select('*').order('name');IG=data||[];return IG}
+function igName(id){const g=IG.find(x=>x.id==id);return g?g.name:'—'}
+function igOpts(sel){return'<option value="">—</option>'+IG.map(g=>`<option value="${g.id}" ${g.id==sel?'selected':''}>${g.name}</option>`).join('')}
+
+// XLSX helpers
+function toXlsx(data,fn,sn='Data'){const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,sn);XLSX.writeFile(wb,fn)}
+
+// Selection state per page
+let SEL=new Set();
+function clrSel(){SEL.clear();updSB()}
+function tglSel(id){SEL.has(id)?SEL.delete(id):SEL.add(id);updSB()}
+function tglAll(ck){$$('.rcb').forEach(c=>{c.checked=ck;ck?SEL.add(+c.dataset.id):SEL.delete(+c.dataset.id)});updSB()}
+function updSB(){const b=$('#selBar');if(!b)return;if(SEL.size>0){b.style.display='flex';b.innerHTML=`<strong>${SEL.size}</strong> izabrano <button class="bt bt-s bt-d" onclick="delSelected()">🗑 Obriši izabrane</button> <button class="bt bt-s bt-o" onclick="exportSelXlsx()">📊 XLSX</button> <button class="bt bt-s bt-n" onclick="clrSel();nav()">✕</button>`}else b.style.display='none'}
+
+// Current page context for generic operations
+let CTX={table:'',cols:[],render:null};
+
+async function delSelected(){if(!SEL.size)return;if(!confirm(`Obrisati ${SEL.size} stavki?`))return;
+  const{error}=await sb.from(CTX.table).delete().in('id',[...SEL]);if(error)return flash(error.message,'e');
+  flash(`${SEL.size} obrisano!`);clrSel();CTX.render?.()}
+
+async function exportSelXlsx(){if(!SEL.size)return;
+  const{data}=await sb.from(CTX.table).select('*').in('id',[...SEL]);if(!data?.length)return;
+  toXlsx(data,CTX.table+'_export.xlsx');flash(`${data.length} izvezeno!`)}
+
+async function exportAllXlsx(table,name){
+  const{data}=await sb.from(table||CTX.table).select('*').order('id');if(!data?.length)return flash('Nema','e');
+  toXlsx(data,(name||table||CTX.table)+'_export.xlsx');flash(`${data.length} izvezeno!`)}
+
+// ═══════ GENERIC XLSX IMPORT ═══════
+let IMP={data:null,headers:[],table:'',fields:[],render:null};
+
+function openImport(table,fields,renderFn){
+  IMP={data:null,headers:[],table,fields,render:renderFn};
+  $('#importModalInner').innerHTML=`<h2>📥 Import iz Excel-a → ${table}</h2>
+    <div class="uz" id="impDZ" onclick="$('#impFI').click()">
+      <p><strong>Kliknite ili prevucite fajl</strong></p><div class="hn">.xlsx .xls .csv</div></div>
+    <input type="file" id="impFI" accept=".xlsx,.xls,.csv" style="display:none" onchange="impFile(this.files[0])">
+    <div id="impBody" style="display:none"></div>`;
+  const dz=$('#impDZ');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dg')});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('dg'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dg');impFile(e.dataTransfer.files[0])});
+  $('#importModal').classList.add('open');
+}
+
+function impFile(f){if(!f)return;const r=new FileReader();
+  r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});
+    IMP.data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    if(!IMP.data.length)return flash('Prazan!','e');IMP.headers=Object.keys(IMP.data[0]);showImpMap()}
+  catch(er){flash(er.message,'e')}};r.readAsArrayBuffer(f)}
+
+function autoM(fk,headers){const al={item_number:['item_number','item number','artikal','šifra','sifra','sku','broj'],reference:['reference','referenca','ref'],product_name:['product_name','product name','naziv','name','artikal','proizvod'],account_name:['account_name','account name','account','konto','kupac','nalog'],warehouse:['warehouse','magacin','skladište','skladiste','wh'],license_plate:['license_plate','license plate','lp','tablica','oznaka'],quantity:['quantity','qty','kolicina','količina','kom'],cost_price:['cost_price','cost price','cost','nabavna'],sell_price:['sell_price','sell price','sell','prodajna'],purch_price:['purch_price','purch price','purchase','nabavka'],operation:['operation','operacija','tip'],price:['price','cena','cijena'],amount:['amount','iznos','ukupno'],note:['note','napomena','opis'],date:['date','datum'],item_group:['item_group','item group','grupa','group','kategorija']};
+  const ks=al[fk]||[fk];return headers.find(h=>ks.some(k=>h.toLowerCase().replace(/[_\s.-]/g,'').includes(k)))||''}
+
+function showImpMap(){$('#impBody').style.display='';
+  $('#impBody').innerHTML=`<div style="margin:14px 0">
+    <div class="fg"><label>Počni od reda</label><input type="number" id="impStartRow" min="1" value="1" style="width:100px"></div>
+    ${IMP.fields.map(f=>`<div class="mrow"><label>${f.label}</label><select id="im_${f.key}"><option value="">— Ne uvozi —</option>${IMP.headers.map(h=>`<option value="${h}" ${autoM(f.key,IMP.headers)===h?'selected':''}>${h}</option>`).join('')}</select></div>`).join('')}
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button class="bt bt-p" onclick="execImport()">📥 Uvezi</button>
+      <button class="bt bt-n" onclick="cM('importModal')">Otkaži</button>
+      <span id="impSt" class="tm ts"></span></div></div>
+    <div class="cd" style="margin-top:12px"><div class="ch">Pregled (${IMP.data.length} redova)</div>
+    <div class="eprev"><table><thead><tr>${IMP.headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${IMP.data.slice(0,12).map(r=>`<tr>${IMP.headers.map(h=>`<td>${r[h]??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`}
+
+async function execImport(){
+  const startRow=(parseInt($('#impStartRow')?.value)||1)-1;
+  const mp={};IMP.fields.forEach(f=>mp[f.key]=$(`#im_${f.key}`)?.value||'');
+  const req=IMP.fields.filter(f=>f.req);
+  for(const r of req){if(!mp[r.key])return flash(`${r.label} je obavezno polje!`,'e')}
+  const st=$('#impSt');let ok=0,er=0;
+  const rows=IMP.data.slice(startRow);
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i];st.textContent=`${i+1}/${rows.length}...`;
+    const d={};let skip=false;
+    for(const f of IMP.fields){
+      if(!mp[f.key])continue;
+      let v=row[mp[f.key]];
+      if(f.type==='num')v=parseFloat(v)||0;
+      else if(f.type==='ig'){
+        const gn=String(v||'').trim().toLowerCase();
+        if(gn){let g=IG.find(x=>x.name.toLowerCase()===gn);
+          if(!g){const{data:ng}=await sb.from('inv_item_groups').insert({name:String(v).trim()}).select().single();if(ng){IG.push(ng);g=ng}}
+          v=g?g.id:null}else v=null;
+      } else v=String(v||'').trim()||null;
+      d[f.db||f.key]=v;
+      if(f.req&&!v){skip=true;break}
+    }
+    if(skip){er++;continue}
+    const{error}=await sb.from(IMP.table).insert(d);if(error){er++;continue}ok++}
+  st.textContent='';flash(`${ok} uvezeno${er?`, ${er} grešaka`:''}`);
+  if(ok>0){await loadIG();cM('importModal');IMP.render?.()}}
+
+// ═══════ ROUTER ═══════
+const routes={'/' :renderDash,'/items':renderItems,'/lp':renderLP,'/pl':renderPL,'/ia':renderIA,'/ig':renderIGPage};
+function nav(){const h=location.hash.slice(1)||'/';(routes[h]||renderDash)();
+  $$('.sb nav a').forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+h||(h==='/'&&a.getAttribute('href')==='#/')));clrSel()}
+window.addEventListener('hashchange',nav);window.addEventListener('load',async()=>{await loadIG();nav()});
+
+// ═══════ DASHBOARD ═══════
+async function renderDash(){A().innerHTML=spin();
+  const[it,lp,pl,ia]=await Promise.all([
+    sb.from('inv_items').select('id',{count:'exact',head:true}),
+    sb.from('inv_license_plates').select('id',{count:'exact',head:true}),
+    sb.from('inv_price_list').select('id',{count:'exact',head:true}),
+    sb.from('inv_inventory_accounting').select('id',{count:'exact',head:true})]);
+  A().innerHTML=`<div class="ph"><div><h1>Dashboard</h1><div class="st">Autor: Predrag Mirković</div></div></div>
+    <div class="sg">
+      <div class="sc"><div class="lb">Items</div><div class="vl va">${it.count||0}</div></div>
+      <div class="sc"><div class="lb">License Plates</div><div class="vl vb">${lp.count||0}</div></div>
+      <div class="sc"><div class="lb">Price List</div><div class="vl vg">${pl.count||0}</div></div>
+      <div class="sc"><div class="lb">Inv. Accounting</div><div class="vl vc">${ia.count||0}</div></div>
+      <div class="sc"><div class="lb">Item Groups</div><div class="vl vo">${IG.length}</div></div>
+    </div>`}
+
+// ═══════ ITEMS ═══════
+const ITEMS_FIELDS=[{key:'item_number',label:'Item Number',req:true},{key:'reference',label:'Reference'},{key:'product_name',label:'Product Name',req:true},{key:'account_name',label:'Account Name'},{key:'item_group',label:'Item Group',type:'ig',db:'item_group_id'},{key:'warehouse',label:'Warehouse'}];
+
+async function renderItems(){A().innerHTML=spin();CTX={table:'inv_items',render:renderItems};
+  const{data}=await sb.from('inv_items').select('*, inv_item_groups(name)').order('id');const D=data||[];
+  A().innerHTML=`<div class="ph"><div><h1>Items</h1><div class="st">${D.length} stavki</div></div>
+    <div class="ha"><button class="bt bt-p" onclick="openItemForm()">+ Nova</button>
+    <button class="bt bt-o" onclick="exportAllXlsx('inv_items','items')">📊 XLSX</button>
+    <button class="bt bt-c" onclick="openImport('inv_items',ITEMS_FIELDS,renderItems)">📥 Import</button></div></div>
+    <div class="fl"><input type="text" id="sf" placeholder="Pretraga..." style="min-width:240px" oninput="flt()"></div>
+    <div class="sb-bar" id="selBar"></div>
+    <div class="cd"><table><thead><tr><th style="width:30px"><input type="checkbox" class="cb" onchange="tglAll(this.checked)"></th>
+    <th>ID</th><th>Item Number</th><th>Reference</th><th>Product Name</th><th>Account</th><th>Group</th><th>Warehouse</th><th>Created</th><th class="tr">Akcije</th></tr></thead>
+    <tbody id="tBody">${D.map(r=>`<tr data-f="${(r.item_number+r.product_name+(r.account_name||'')).toLowerCase()}">
+      <td><input type="checkbox" class="cb rcb" data-id="${r.id}" onchange="tglSel(${r.id})"></td>
+      <td class="mn-t tm">${r.id}</td><td class="mn-t">${r.item_number}</td><td class="tm ts">${r.reference||'—'}</td>
+      <td><strong>${r.product_name}</strong></td><td class="tm ts">${r.account_name||'—'}</td>
+      <td>${r.inv_item_groups?`<span class="bg bg-a">${r.inv_item_groups.name}</span>`:'—'}</td>
+      <td class="tm ts">${r.warehouse||'—'}</td><td class="tm ts">${dF(r.creation_date)}</td>
+      <td class="tr"><div class="bg-grp" style="justify-content:flex-end">
+        <button class="bt bt-s bt-n" onclick="openItemForm(${r.id})">✎</button>
+        <button class="bt bt-s bt-d" onclick="delRow('inv_items',${r.id},renderItems)">✕</button></div></td></tr>`).join('')}</tbody></table>
+    ${D.length?'':'<div class="ce">Nema stavki</div>'}</div>`}
+
+function openItemForm(id){
+  const md=$('#formModalInner');
+  md.innerHTML=`<h2>${id?'Izmeni':'Nova'} stavka</h2><input type="hidden" id="fId" value="${id||''}">
+    <div class="fgrid">
+      <div class="fg"><label>Item Number *</label><input id="f_item_number"></div>
+      <div class="fg"><label>Reference</label><input id="f_reference"></div>
+      <div class="fg"><label>Product Name *</label><input id="f_product_name"></div>
+      <div class="fg"><label>Account Name</label><input id="f_account_name"></div>
+      <div class="fg"><label>Item Group</label><select id="f_item_group_id">${igOpts()}</select></div>
+      <div class="fg"><label>Warehouse</label><input id="f_warehouse"></div></div>
+    <div class="md-a"><button class="bt bt-n" onclick="cM('formModal')">Otkaži</button>
+      <button class="bt bt-p" onclick="saveItem()">Sačuvaj</button></div>`;
+  if(id){sb.from('inv_items').select('*').eq('id',id).single().then(({data:r})=>{if(!r)return;
+    $('#f_item_number').value=r.item_number;$('#f_reference').value=r.reference||'';$('#f_product_name').value=r.product_name;
+    $('#f_account_name').value=r.account_name||'';$('#f_item_group_id').value=r.item_group_id||'';$('#f_warehouse').value=r.warehouse||''})}
+  $('#formModal').classList.add('open')}
+
+async function saveItem(){const id=$('#fId').value;
+  const d={item_number:$('#f_item_number').value.trim(),reference:$('#f_reference').value.trim()||null,product_name:$('#f_product_name').value.trim(),
+    account_name:$('#f_account_name').value.trim()||null,item_group_id:$('#f_item_group_id').value||null,warehouse:$('#f_warehouse').value.trim()||null};
+  if(!d.item_number||!d.product_name)return flash('Item Number i Product Name!','e');
+  if(id){const{error}=await sb.from('inv_items').update(d).eq('id',id);if(error)return flash(error.message,'e')}
+  else{const{error}=await sb.from('inv_items').insert(d);if(error)return flash(error.message,'e')}
+  flash('OK!');cM('formModal');renderItems()}
+
+// ═══════ LICENSE PLATE ═══════
+const LP_FIELDS=[{key:'item_number',label:'Item Number'},{key:'product_name',label:'Product Name'},{key:'license_plate',label:'License Plate',req:true},{key:'quantity',label:'Quantity',type:'num'},{key:'account_name',label:'Account Name'},{key:'warehouse',label:'Warehouse'}];
+let lpCols=['id','item_number','product_name','license_plate','quantity','account_name','warehouse','creation_date'];
+const lpColLabels={id:'ID',item_number:'Item Number',product_name:'Product Name',license_plate:'License Plate',quantity:'Quantity',account_name:'Account',warehouse:'Warehouse',creation_date:'Created'};
+
+async function renderLP(){A().innerHTML=spin();CTX={table:'inv_license_plates',render:renderLP};
+  const{data}=await sb.from('inv_license_plates').select('*').order('id');const D=data||[];
+  const saved=localStorage.getItem('lp_col_order');if(saved)try{lpCols=JSON.parse(saved)}catch(e){}
+
+  A().innerHTML=`<div class="ph"><div><h1>License Plate</h1><div class="st">${D.length} stavki</div></div>
+    <div class="ha"><button class="bt bt-p" onclick="openLPForm()">+ Nova</button>
+    <button class="bt bt-o" onclick="exportAllXlsx('inv_license_plates','license_plates')">📊 XLSX</button>
+    <button class="bt bt-c" onclick="openImport('inv_license_plates',LP_FIELDS,renderLP)">📥 Import</button></div></div>
+    <div style="margin-bottom:10px;font-size:.72rem;color:var(--tx2)">Raspored kolona (prevucite za promenu):</div>
+    <div class="col-order" id="colOrder">${lpCols.map(c=>`<div class="col-chip" draggable="true" data-col="${c}"><span class="grip">⋮⋮</span> ${lpColLabels[c]||c}</div>`).join('')}</div>
+    <div class="fl"><input type="text" id="sf" placeholder="Pretraga..." style="min-width:240px" oninput="flt()"></div>
+    <div class="sb-bar" id="selBar"></div>
+    <div class="cd"><table><thead><tr><th style="width:30px"><input type="checkbox" class="cb" onchange="tglAll(this.checked)"></th>
+    ${lpCols.map(c=>`<th>${lpColLabels[c]||c}</th>`).join('')}<th class="tr">Akcije</th></tr></thead>
+    <tbody id="tBody">${D.map(r=>`<tr data-f="${((r.item_number||'')+(r.product_name||'')+(r.license_plate||'')).toLowerCase()}">
+      <td><input type="checkbox" class="cb rcb" data-id="${r.id}" onchange="tglSel(${r.id})"></td>
+      ${lpCols.map(c=>{let v=r[c];if(c==='creation_date')v=dF(v);else if(c==='quantity')v=fmt(v);else v=v||'—';
+        return c==='id'?`<td class="mn-t tm">${v}</td>`:c==='product_name'?`<td><strong>${v}</strong></td>`:`<td class="tm ts">${v}</td>`}).join('')}
+      <td class="tr"><div class="bg-grp" style="justify-content:flex-end">
+        <button class="bt bt-s bt-n" onclick="openLPForm(${r.id})">✎</button>
+        <button class="bt bt-s bt-d" onclick="delRow('inv_license_plates',${r.id},renderLP)">✕</button></div></td></tr>`).join('')}</tbody></table>
+    ${D.length?'':'<div class="ce">Nema stavki</div>'}</div>`;
+  initColDrag()}
+
+function initColDrag(){const cont=$('#colOrder');if(!cont)return;let dragEl=null;
+  cont.querySelectorAll('.col-chip').forEach(chip=>{
+    chip.addEventListener('dragstart',()=>{dragEl=chip;chip.style.opacity='.4'});
+    chip.addEventListener('dragend',()=>{dragEl=null;chip.style.opacity='1'});
+    chip.addEventListener('dragover',e=>e.preventDefault());
+    chip.addEventListener('drop',e=>{e.preventDefault();if(!dragEl||dragEl===chip)return;
+      const all=[...cont.children];const from=all.indexOf(dragEl),to=all.indexOf(chip);
+      if(from<to)chip.after(dragEl);else chip.before(dragEl);
+      lpCols=[...cont.children].map(c=>c.dataset.col);
+      localStorage.setItem('lp_col_order',JSON.stringify(lpCols));renderLP()})})}
+
+function openLPForm(id){
+  const md=$('#formModalInner');
+  md.innerHTML=`<h2>${id?'Izmeni':'Nova'} License Plate</h2><input type="hidden" id="fId" value="${id||''}">
+    <div class="fgrid">
+      <div class="fg"><label>Item Number</label><input id="f_item_number"></div>
+      <div class="fg"><label>Product Name</label><input id="f_product_name"></div>
+      <div class="fg"><label>License Plate *</label><input id="f_license_plate"></div>
+      <div class="fg"><label>Quantity</label><input type="number" step="0.01" id="f_quantity" value="0"></div>
+      <div class="fg"><label>Account Name</label><input id="f_account_name"></div>
+      <div class="fg"><label>Warehouse</label><input id="f_warehouse"></div></div>
+    <div class="md-a"><button class="bt bt-n" onclick="cM('formModal')">Otkaži</button><button class="bt bt-p" onclick="saveLP()">Sačuvaj</button></div>`;
+  if(id){sb.from('inv_license_plates').select('*').eq('id',id).single().then(({data:r})=>{if(!r)return;
+    $('#f_item_number').value=r.item_number||'';$('#f_product_name').value=r.product_name||'';$('#f_license_plate').value=r.license_plate;
+    $('#f_quantity').value=r.quantity;$('#f_account_name').value=r.account_name||'';$('#f_warehouse').value=r.warehouse||''})}
+  $('#formModal').classList.add('open')}
+
+async function saveLP(){const id=$('#fId').value;
+  const d={item_number:$('#f_item_number').value.trim()||null,product_name:$('#f_product_name').value.trim()||null,
+    license_plate:$('#f_license_plate').value.trim(),quantity:parseFloat($('#f_quantity').value)||0,
+    account_name:$('#f_account_name').value.trim()||null,warehouse:$('#f_warehouse').value.trim()||null};
+  if(!d.license_plate)return flash('License Plate obavezno!','e');
+  if(id){const{error}=await sb.from('inv_license_plates').update(d).eq('id',id);if(error)return flash(error.message,'e')}
+  else{const{error}=await sb.from('inv_license_plates').insert(d);if(error)return flash(error.message,'e')}
+  flash('OK!');cM('formModal');renderLP()}
+
+// ═══════ PRICE LIST ═══════
+const PL_FIELDS=[{key:'item_number',label:'Item Number',req:true},{key:'reference',label:'Reference'},{key:'product_name',label:'Product Name',req:true},{key:'account_name',label:'Account Name'},{key:'item_group',label:'Item Group',type:'ig',db:'item_group_id'},{key:'cost_price',label:'Cost Price',type:'num'},{key:'sell_price',label:'Sell Price',type:'num'},{key:'purch_price',label:'Purch Price',type:'num'},{key:'operation',label:'Operation'},{key:'date',label:'Date'},{key:'warehouse',label:'Warehouse'}];
+
+async function renderPL(){A().innerHTML=spin();CTX={table:'inv_price_list',render:renderPL};
+  const{data}=await sb.from('inv_price_list').select('*, inv_item_groups(name)').order('id');const D=data||[];
+  A().innerHTML=`<div class="ph"><div><h1>Price List</h1><div class="st">${D.length} stavki</div></div>
+    <div class="ha"><button class="bt bt-p" onclick="openPLForm()">+ Nova</button>
+    <button class="bt bt-o" onclick="exportAllXlsx('inv_price_list','price_list')">📊 XLSX</button>
+    <button class="bt bt-c" onclick="openImport('inv_price_list',PL_FIELDS,renderPL)">📥 Import</button></div></div>
+    <div class="fl"><input type="text" id="sf" placeholder="Pretraga..." style="min-width:240px" oninput="flt()"></div>
+    <div class="sb-bar" id="selBar"></div>
+    <div class="cd"><div style="overflow-x:auto"><table><thead><tr><th style="width:30px"><input type="checkbox" class="cb" onchange="tglAll(this.checked)"></th>
+    <th>ID</th><th>Item No.</th><th>Ref</th><th>Product Name</th><th>Account</th><th>Group</th><th class="tr">Cost</th><th class="tr">Sell</th><th class="tr">Purch</th><th>Operation</th><th>Date</th><th>WH</th><th class="tr">Akcije</th></tr></thead>
+    <tbody id="tBody">${D.map(r=>`<tr data-f="${(r.item_number+r.product_name+(r.account_name||'')).toLowerCase()}">
+      <td><input type="checkbox" class="cb rcb" data-id="${r.id}" onchange="tglSel(${r.id})"></td>
+      <td class="mn-t tm">${r.id}</td><td class="mn-t">${r.item_number}</td><td class="tm ts">${r.reference||'—'}</td>
+      <td><strong>${r.product_name}</strong></td><td class="tm ts">${r.account_name||'—'}</td>
+      <td>${r.inv_item_groups?`<span class="bg bg-a">${r.inv_item_groups.name}</span>`:'—'}</td>
+      <td class="tr mn-t">${fmt(r.cost_price)}</td><td class="tr mn-t">${fmt(r.sell_price)}</td><td class="tr mn-t">${fmt(r.purch_price)}</td>
+      <td class="tm ts">${r.operation||'—'}</td><td class="tm ts">${dF(r.date)}</td><td class="tm ts">${r.warehouse||'—'}</td>
+      <td class="tr"><div class="bg-grp" style="justify-content:flex-end">
+        <button class="bt bt-s bt-n" onclick="openPLForm(${r.id})">✎</button>
+        <button class="bt bt-s bt-d" onclick="delRow('inv_price_list',${r.id},renderPL)">✕</button></div></td></tr>`).join('')}</tbody></table></div>
+    ${D.length?'':'<div class="ce">Nema stavki</div>'}</div>`}
+
+function openPLForm(id){
+  const md=$('#formModalInner');
+  md.innerHTML=`<h2>${id?'Izmeni':'Nova'} Price List stavka</h2><input type="hidden" id="fId" value="${id||''}">
+    <div class="fgrid">
+      <div class="fg"><label>Item Number *</label><input id="f_item_number"></div>
+      <div class="fg"><label>Reference</label><input id="f_reference"></div>
+      <div class="fg"><label>Product Name *</label><input id="f_product_name"></div>
+      <div class="fg"><label>Account Name</label><input id="f_account_name"></div>
+      <div class="fg"><label>Item Group</label><select id="f_item_group_id">${igOpts()}</select></div>
+      <div class="fg"><label>Cost Price</label><input type="number" step="0.01" id="f_cost_price" value="0"></div>
+      <div class="fg"><label>Sell Price</label><input type="number" step="0.01" id="f_sell_price" value="0"></div>
+      <div class="fg"><label>Purch Price</label><input type="number" step="0.01" id="f_purch_price" value="0"></div>
+      <div class="fg"><label>Operation</label><input id="f_operation"></div>
+      <div class="fg"><label>Date</label><input type="datetime-local" id="f_date"></div>
+      <div class="fg"><label>Warehouse</label><input id="f_warehouse"></div></div>
+    <div class="md-a"><button class="bt bt-n" onclick="cM('formModal')">Otkaži</button><button class="bt bt-p" onclick="savePL()">Sačuvaj</button></div>`;
+  if(id){sb.from('inv_price_list').select('*').eq('id',id).single().then(({data:r})=>{if(!r)return;
+    $('#f_item_number').value=r.item_number;$('#f_reference').value=r.reference||'';$('#f_product_name').value=r.product_name;
+    $('#f_account_name').value=r.account_name||'';$('#f_item_group_id').value=r.item_group_id||'';
+    $('#f_cost_price').value=r.cost_price;$('#f_sell_price').value=r.sell_price;$('#f_purch_price').value=r.purch_price;
+    $('#f_operation').value=r.operation||'';$('#f_date').value=r.date?r.date.substring(0,16):'';$('#f_warehouse').value=r.warehouse||''})}
+  $('#formModal').classList.add('open')}
+
+async function savePL(){const id=$('#fId').value;
+  const d={item_number:$('#f_item_number').value.trim(),reference:$('#f_reference').value.trim()||null,product_name:$('#f_product_name').value.trim(),
+    account_name:$('#f_account_name').value.trim()||null,item_group_id:$('#f_item_group_id').value||null,
+    cost_price:parseFloat($('#f_cost_price').value)||0,sell_price:parseFloat($('#f_sell_price').value)||0,purch_price:parseFloat($('#f_purch_price').value)||0,
+    operation:$('#f_operation').value.trim()||null,date:$('#f_date').value?new Date($('#f_date').value).toISOString():null,warehouse:$('#f_warehouse').value.trim()||null};
+  if(!d.item_number||!d.product_name)return flash('Item Number i Product Name!','e');
+  if(id){const{error}=await sb.from('inv_price_list').update(d).eq('id',id);if(error)return flash(error.message,'e')}
+  else{const{error}=await sb.from('inv_price_list').insert(d);if(error)return flash(error.message,'e')}
+  flash('OK!');cM('formModal');renderPL()}
+
+// ═══════ INVENTORY ACCOUNTING ═══════
+const IA_FIELDS=[{key:'item_number',label:'Item Number'},{key:'reference',label:'Reference'},{key:'product_name',label:'Product Name'},{key:'license_plate',label:'License Plate'},{key:'quantity',label:'Quantity',type:'num'},{key:'price',label:'Price',type:'num'},{key:'amount',label:'Amount',type:'num'},{key:'warehouse',label:'Warehouse'},{key:'date',label:'Date'},{key:'account_name',label:'Account Name'},{key:'note',label:'Note'}];
+
+async function renderIA(){A().innerHTML=spin();CTX={table:'inv_inventory_accounting',render:renderIA};
+  const{data}=await sb.from('inv_inventory_accounting').select('*').order('id');const D=data||[];
+  A().innerHTML=`<div class="ph"><div><h1>Inventory Accounting</h1><div class="st">${D.length} stavki</div></div>
+    <div class="ha">
+      <button class="bt bt-p" onclick="openIAForm()">+ Nova</button>
+      <button class="bt bt-g" onclick="loadFromLP()">📋 Load Data from LP</button>
+      <button class="bt bt-c" onclick="loadPrices()">💰 Load Prices</button>
+      <button class="bt bt-o" onclick="exportAllXlsx('inv_inventory_accounting','inv_accounting')">📊 XLSX</button>
+      <button class="bt bt-c" onclick="openImport('inv_inventory_accounting',IA_FIELDS,renderIA)">📥 Import</button></div></div>
+    <div class="fl"><input type="text" id="sf" placeholder="Pretraga..." style="min-width:240px" oninput="flt()"></div>
+    <div class="sb-bar" id="selBar"></div>
+    <div class="cd" id="iaCard" style="position:relative"><div style="overflow-x:auto"><table><thead><tr><th style="width:30px"><input type="checkbox" class="cb" onchange="tglAll(this.checked)"></th>
+    <th>ID</th><th>Item No.</th><th>Ref</th><th>Product</th><th>LP</th><th class="tr">Qty</th><th class="tr">Price</th><th class="tr">Amount</th><th>WH</th><th>Date</th><th>Account</th><th>Note</th><th>Created</th><th class="tr">Akcije</th></tr></thead>
+    <tbody id="tBody">${D.map(r=>`<tr data-f="${((r.item_number||'')+(r.product_name||'')+(r.license_plate||'')).toLowerCase()}">
+      <td><input type="checkbox" class="cb rcb" data-id="${r.id}" onchange="tglSel(${r.id})"></td>
+      <td class="mn-t tm">${r.id}</td><td class="mn-t">${r.item_number||'—'}</td><td class="tm ts">${r.reference||'—'}</td>
+      <td><strong>${r.product_name||'—'}</strong></td><td class="mn-t">${r.license_plate||'—'}</td>
+      <td class="tr mn-t">${fmt(r.quantity)}</td><td class="tr mn-t">${fmt(r.price)}</td><td class="tr mn-t vg">${fmt(r.amount)}</td>
+      <td class="tm ts">${r.warehouse||'—'}</td><td class="tm ts">${dF(r.date)}</td><td class="tm ts">${r.account_name||'—'}</td>
+      <td class="tm ts">${r.note||'—'}</td><td class="tm ts">${dF(r.creation_date)}</td>
+      <td class="tr"><div class="bg-grp" style="justify-content:flex-end">
+        <button class="bt bt-s bt-n" onclick="openIAForm(${r.id})">✎</button>
+        <button class="bt bt-s bt-d" onclick="delRow('inv_inventory_accounting',${r.id},renderIA)">✕</button></div></td></tr>`).join('')}</tbody></table></div>
+    ${D.length?'':'<div class="ce">Nema stavki</div>'}</div>`}
+
+function openIAForm(id){
+  const md=$('#formModalInner');
+  md.innerHTML=`<h2>${id?'Izmeni':'Nova'} stavka</h2><input type="hidden" id="fId" value="${id||''}">
+    <div class="fgrid">
+      <div class="fg"><label>Item Number</label><input id="f_item_number"></div>
+      <div class="fg"><label>Reference</label><input id="f_reference"></div>
+      <div class="fg"><label>Product Name</label><input id="f_product_name"></div>
+      <div class="fg"><label>License Plate</label><input id="f_license_plate"></div>
+      <div class="fg"><label>Quantity</label><input type="number" step="0.01" id="f_quantity" value="0"></div>
+      <div class="fg"><label>Price</label><input type="number" step="0.01" id="f_price" value="0"></div>
+      <div class="fg"><label>Amount</label><input type="number" step="0.01" id="f_amount" value="0" readonly style="opacity:.6"></div>
+      <div class="fg"><label>Warehouse</label><input id="f_warehouse"></div>
+      <div class="fg"><label>Date</label><input type="datetime-local" id="f_date"></div>
+      <div class="fg"><label>Account Name</label><input id="f_account_name"></div>
+      <div class="fg"><label>Note</label><input id="f_note"></div></div>
+    <div class="md-a"><button class="bt bt-n" onclick="cM('formModal')">Otkaži</button><button class="bt bt-p" onclick="saveIA()">Sačuvaj</button></div>`;
+  // Auto-calc amount
+  const calc=()=>{const q=parseFloat($('#f_quantity')?.value)||0,p=parseFloat($('#f_price')?.value)||0;$('#f_amount').value=(q*p).toFixed(2)};
+  setTimeout(()=>{$('#f_quantity')?.addEventListener('input',calc);$('#f_price')?.addEventListener('input',calc)},50);
+  if(id){sb.from('inv_inventory_accounting').select('*').eq('id',id).single().then(({data:r})=>{if(!r)return;
+    $('#f_item_number').value=r.item_number||'';$('#f_reference').value=r.reference||'';$('#f_product_name').value=r.product_name||'';
+    $('#f_license_plate').value=r.license_plate||'';$('#f_quantity').value=r.quantity;$('#f_price').value=r.price;$('#f_amount').value=r.amount;
+    $('#f_warehouse').value=r.warehouse||'';$('#f_date').value=r.date?r.date.substring(0,16):'';$('#f_account_name').value=r.account_name||'';$('#f_note').value=r.note||''})}
+  $('#formModal').classList.add('open')}
+
+async function saveIA(){const id=$('#fId').value;const q=parseFloat($('#f_quantity').value)||0,p=parseFloat($('#f_price').value)||0;
+  const d={item_number:$('#f_item_number').value.trim()||null,reference:$('#f_reference').value.trim()||null,product_name:$('#f_product_name').value.trim()||null,
+    license_plate:$('#f_license_plate').value.trim()||null,quantity:q,price:p,amount:q*p,
+    warehouse:$('#f_warehouse').value.trim()||null,date:$('#f_date').value?new Date($('#f_date').value).toISOString():null,
+    account_name:$('#f_account_name').value.trim()||null,note:$('#f_note').value.trim()||null};
+  if(id){const{error}=await sb.from('inv_inventory_accounting').update(d).eq('id',id);if(error)return flash(error.message,'e')}
+  else{const{error}=await sb.from('inv_inventory_accounting').insert(d);if(error)return flash(error.message,'e')}
+  flash('OK!');cM('formModal');renderIA()}
+
+// ═══ LOAD DATA FROM LP ═══
+async function loadFromLP(){
+  const card=$('#iaCard');if(!card)return;
+  const{data:iaRows}=await sb.from('inv_inventory_accounting').select('id,license_plate').not('license_plate','is',null);
+  if(!iaRows?.length)return flash('Nema stavki sa License Plate!','e');
+  const lps=[...new Set(iaRows.map(r=>r.license_plate).filter(Boolean))];
+  const{data:lpData}=await sb.from('inv_license_plates').select('*').in('license_plate',lps);
+  if(!lpData?.length)return flash('Nema poklapanja u LP tabeli!','e');
+  const lpMap={};lpData.forEach(lp=>{lpMap[lp.license_plate]=lp});
+
+  // Lock + progress
+  const overlay=document.createElement('div');overlay.className='lock-overlay';
+  overlay.innerHTML=`<div class="spn"></div><div id="lpProg">Učitavanje LP podataka...</div><div class="pbar" style="width:60%"><div class="pbar-fill" id="lpBar" style="width:0%"></div></div>`;
+  card.appendChild(overlay);
+  let done=0;const total=iaRows.length;
+  for(const row of iaRows){
+    const lp=lpMap[row.license_plate];
+    if(lp){await sb.from('inv_inventory_accounting').update({
+      item_number:lp.item_number,product_name:lp.product_name,quantity:lp.quantity,
+      account_name:lp.account_name,warehouse:lp.warehouse}).eq('id',row.id)}
+    done++;$('#lpBar').style.width=((done/total)*100)+'%';$('#lpProg').textContent=`${done}/${total}...`}
+  overlay.remove();flash(`LP podaci učitani za ${done} stavki!`);renderIA()}
+
+// ═══ LOAD PRICES ═══
+async function loadPrices(){
+  const card=$('#iaCard');if(!card)return;
+  const{data:iaRows}=await sb.from('inv_inventory_accounting').select('id,item_number,quantity').not('item_number','is',null);
+  if(!iaRows?.length)return flash('Nema stavki sa Item Number!','e');
+  const ins=[...new Set(iaRows.map(r=>r.item_number).filter(Boolean))];
+  const{data:plData}=await sb.from('inv_price_list').select('item_number,sell_price').in('item_number',ins);
+  if(!plData?.length)return flash('Nema cena u Price List!','e');
+  const priceMap={};plData.forEach(p=>{priceMap[p.item_number]=p.sell_price});
+
+  const overlay=document.createElement('div');overlay.className='lock-overlay';
+  overlay.innerHTML=`<div class="spn"></div><div id="prProg">Učitavanje cena...</div><div class="pbar" style="width:60%"><div class="pbar-fill" id="prBar" style="width:0%"></div></div>`;
+  card.appendChild(overlay);
+  let done=0,updated=0;const total=iaRows.length;
+  for(const row of iaRows){
+    const pr=priceMap[row.item_number];
+    if(pr!==undefined){const amt=(row.quantity||0)*pr;
+      await sb.from('inv_inventory_accounting').update({price:pr,amount:amt}).eq('id',row.id);updated++}
+    done++;$('#prBar').style.width=((done/total)*100)+'%';$('#prProg').textContent=`${done}/${total}...`}
+  overlay.remove();flash(`Cene učitane za ${updated} stavki!`);renderIA()}
+
+// ═══════ ITEM GROUPS ═══════
+async function renderIGPage(){A().innerHTML=spin();await loadIG();
+  A().innerHTML=`<div class="ph"><h1>Item Groups</h1></div>
+    <div class="two"><div class="cd" style="padding:18px"><h3 style="margin-bottom:12px">Nova grupa</h3>
+    <div class="fg"><label>Naziv</label><input id="igN" placeholder="npr. Electronics"></div>
+    <button class="bt bt-p" onclick="addIG()">Dodaj</button></div>
+    <div class="cd"><div class="ch">Postojeće</div><table><thead><tr><th>ID</th><th>Naziv</th><th class="tr">Akcija</th></tr></thead>
+    <tbody>${IG.map(g=>`<tr><td class="mn-t tm">${g.id}</td><td><strong>${g.name}</strong></td>
+      <td class="tr"><button class="bt bt-s bt-d" onclick="delRow('inv_item_groups',${g.id},renderIGPage);loadIG()">✕</button></td></tr>`).join('')}</tbody></table>
+    ${IG.length?'':'<div class="ce">Nema grupa</div>'}</div></div>`}
+
+async function addIG(){const n=$('#igN').value.trim();if(!n)return flash('Naziv!','e');
+  const{error}=await sb.from('inv_item_groups').insert({name:n});if(error)return flash(error.message,'e');
+  await loadIG();flash('OK!');renderIGPage()}
+
+// ═══════ GENERIC HELPERS ═══════
+async function delRow(table,id,render){if(!confirm('Obrisati?'))return;
+  const{error}=await sb.from(table).delete().eq('id',id);if(error)return flash(error.message,'e');flash('Obrisano.');render?.()}
+
+function flt(){const s=($('#sf')?.value||'').toLowerCase();$$('#tBody tr').forEach(tr=>{tr.style.display=(tr.dataset.f||'').includes(s)?'':'none'})}
+</script>
+</body>
+</html>
